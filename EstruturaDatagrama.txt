@@ -1,0 +1,21 @@
+Bytes
+
+Head:
+0- Número do pacote
+1- Total de pacotes
+2- Tamanho do Payload
+3- 
+4-
+5-
+6-
+7-
+8-
+9-
+10-
+11- Handshake
+
+
+PAYLOAD: 12 ~ 61
+
+
+EOP:   /xfb/xfb/xfb
