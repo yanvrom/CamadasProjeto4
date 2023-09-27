@@ -65,28 +65,26 @@ def split_message(message):
 
     return head, payload, eop
 
-def checa_crc(polinomio_input, teste):
+def checa_crc(head, payload):
     pass
 
 def escreve_report(entrada, id):
-    with open(f"Server{id},txt", 'w') as arquivo:
-        arquivo.write(entrada)
+    with open(f"Server{id}.txt", 'a') as arquivo:
+        arquivo.write(entrada + "\n")
     arquivo.close()
 
 def main():
     try:
 
         id = 0
-        while os.path.exists(f"{id}.txt"):
+        while os.path.exists(f"Server{id}.txt"):
             id += 1
 
-        tempo = datetime.datetime.now()
-        escreve_report('teste', id)
         print("Iniciou o main")
+
         #declaramos um objeto do tipo enlace com o nome "com". Essa é a camada inferior à aplicação. Observe que um parametro
         #para declarar esse objeto é o nome da porta.
         com1 = enlace(serialName)
-        
 
         # Ativa comunicacao. Inicia os threads e a comunicação seiral 
         com1.enable()
@@ -124,15 +122,16 @@ def main():
                         print("Erro no EOP!")
                         head = bytearray()
                         time.sleep(1)
-                    
+
                     if head[0] == 1 and head[1] == server:
+                        escreve_report(f"{tempo} / receb / 1 / 14", id)
                         num_pckg = head[3]
                         id_arquivo = head[5]
                         ocioso = False
                         com1.sendData(MENSAGEM_T2)
                         print('enviei mensagem T2')
-                else:
-                    pass
+                        tempo = datetime.datetime.now()
+                        escreve_report(f"{tempo} / envio / 2 / 14", id)
                     
         tempo = datetime.datetime.now()
         print(tempo,end=' ')
@@ -160,11 +159,11 @@ def main():
 
                 head, payload, eop = split_message(mensagem)
 
-                print(head, payload, eop)
-
                 flag_erro = False
 
+                tempo = datetime.datetime.now()
                 print(tempo,end=' ')
+                escreve_report(f"{tempo} / receb / {head[0]} / {head[5]} / {head[4]} / {head[3]}", id)
                 
                 # CHECANDO SE EOP VEIO CERTO
                 if eop != EOP:
@@ -188,20 +187,27 @@ def main():
 
                 # SE NÃO HOUVE ERRO, ENVIA SUCESSO. CASO CONTRÁRIO, ENVIA ERRO
                 if not flag_erro:
-                    print('sucesso')
+                    tempo = datetime.datetime.now()
+                    print(f'Sucesso numero {head[4]}')
                     mensagem_finalizada += payload
                     com1.sendData(gera_mensagem_t4(cont))
+                    escreve_report(f"{tempo} / envio / 4 / 14", id)
                     cont += 1
                 else:
+                    tempo = datetime.datetime.now()
                     print(erro_msg)
                     com1.sendData(gera_mensagem_t6(cont))
+                    escreve_report(f"{tempo} / envio / 6 / 14", id)
+                    mensagem = bytearray()
 
             else:
                 if datetime.datetime.now() - timer2 > datetime.timedelta(seconds=20):
+                    tempo = datetime.datetime.now()
                     print(tempo,end=' ')
                     print('Comunicação finalizada por timeout.')
                     ocioso = True
                     flag_timeout = True
+                    escreve_report(f"{tempo} / envio / 5 / 14", id)
                     com1.sendData(MENSAGEM_T5)
                     break
                 
@@ -209,6 +215,8 @@ def main():
                     print(tempo,end=' ')
                     print('Não recebo nada há 2 segundos, enviando alô...')
                     print(gera_mensagem_t4(cont-1))
+                    tempo = datetime.datetime.now()
+                    escreve_report(f"{tempo} / envio / 4 / 14", id)
                     com1.sendData(gera_mensagem_t4(cont-1))
                     timer1 = datetime.datetime.now()
                     mensagem = bytearray()
@@ -219,19 +227,16 @@ def main():
             print("-------------------------")
             print("Comunicação encerrada")
             print("-------------------------")
+            print("Salvando dados de arquivo")
+            print(" {} ".format(imageW))
+            f = open(imageW, 'wb')
+            f.write(mensagem_finalizada)
+
+            f.close()
         else:
             print("Timeout!")
 
         com1.disable()
-
-        print(mensagem_finalizada)
-
-        print("Salvando dados de arquivo")
-        print(" {} ".format(imageW))
-        f = open(imageW, 'wb')
-        f.write(mensagem_finalizada)
-
-        f.close()
         
     except Exception as erro:
         print("ops! :-\\")
