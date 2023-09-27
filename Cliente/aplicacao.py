@@ -14,12 +14,14 @@ from enlace import *
 import time
 import numpy as np
 import datetime
+from crc import Calculator, Crc16
 import os
 
 servidor = 218
 
 EOP = b"\xaa\xbb\xcc\xdd"
 
+calculator = Calculator(Crc16.CCITT)
         
 def constroi_pacotes(mensagem):
     pacotes = []
@@ -45,7 +47,9 @@ def gera_t1(servidor, total_pacotes, id_arquivo):
     return  b'\x01' + int.to_bytes(servidor, 1, 'little') + b'\x00' + int.to_bytes(total_pacotes, 1, 'little') + int.to_bytes(id_arquivo, 1, 'little') + b'\x00\x00\x00\x00\x00' + EOP
 
 def gera_t3(numero_do_pacote, conteudo, total_pacotes):
-    head = b'\x03\x00\x00' + int.to_bytes(total_pacotes, 1, 'little') + int.to_bytes(numero_do_pacote, 1, 'little') + int.to_bytes(len(conteudo), 1, 'little') + b'\x00\x00\x00\x00'
+    crc_value = calculator.checksum(bytes(conteudo))
+    crc_bytes = crc_value.to_bytes(2, byteorder='big')
+    head = b'\x03\x00\x00' + int.to_bytes(total_pacotes, 1, 'little') + int.to_bytes(numero_do_pacote, 1, 'little') + int.to_bytes(len(conteudo), 1, 'little') + b'\x00\x00' + crc_bytes
     return head + conteudo + EOP
 
 def gera_t5():
@@ -60,7 +64,8 @@ def escreve_arquivo(mensagem, sentido):
         if tipo == "3":
             pacote_enviado = mensagem[4]
             total_pacotes = mensagem[3]
-            texto += f" / {pacote_enviado} / {total_pacotes}"
+            crc_bytes = mensagem[8:10]
+            texto += f" / {pacote_enviado} / {total_pacotes} / {crc_bytes.hex()}"
         texto += "\n"
         
         arquivo.write(texto)
