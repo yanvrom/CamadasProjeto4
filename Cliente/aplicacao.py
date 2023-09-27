@@ -13,108 +13,44 @@
 from enlace import *
 import time
 import numpy as np
-import random
 import datetime
+import os
 
-EOP = b"\xfb\xfb\xfb"
+servidor = 218
 
-MENSAGEM_SUCESSO = b'\x00\x00\00\00\00\00\00\00\00\00\00\00' + EOP
+EOP = b"\xaa\xbb\xcc\xdd"
 
-MENSAGEM_HANDSHAKE = b'\x00\x00\00\00\00\00\00\00\00\00\00\01' + EOP
-
-MENSAGEM_ERRO = b'\00\00\00\00\00\00\00\00\00\00\00\02' + EOP
-
-MENSAGEM_ENCERRADA = b'\00\00\00\00\00\00\00\00\00\00\00\03' + EOP
-
-MENSAGEM_VOLTA = b'\00\00\00\00\00\00\00\00\00\00\00\04' + EOP
-
-command1 = b'\x00\x00\x00\x00'
-command2 = b'\x00\x00\xBB\x00'
-command3 = b'\xBB\x00\x00'
-command4 = b'\x00\xBB\x00'
-command5 = b'\x00\x00\xBB'
-command6 = b'\x00\xAA'
-command7 = b'\xBB\x00'
-command8 = b'\x00'
-command9 = b'\xBB'
-
-commands = [command1,command2,command3,command4,command5,command6,command7,command8,command9]
-
-quantidade = random.randint(50,70)
-
-def sorteia_comandos():
-    random_commands = []
-    i = 1
-    while i <= quantidade:
-        sorteado = random.randint(0,8)
-        random_commands.append(commands[sorteado])
-        i+=1
-    return random_commands
-
-def constroi_mensagem(informacao):
-    mensagem = bytearray([])
-    for command in informacao:
-        mensagem += command
-        mensagem += b'\xFB'
-    return mensagem    
-
-def constroi_head(posicao, total_pacotes, tamanho_payload, handshake):
-    if not (0 <= posicao <= 255 and 0 <= total_pacotes <= 255 and 0 <= tamanho_payload <= 255 and 0 <= handshake <= 255):
-        raise ValueError("Os valores devem estar no intervalo de 0 a 255.")
-    print(f'posicao {posicao} totalpacotes {total_pacotes} tamanho payload: {tamanho_payload}')
-    byte_array = bytearray()
-    byte_array += int.to_bytes(posicao,1,byteorder='little')
-    byte_array += int.to_bytes(total_pacotes,1, byteorder='little')
-    byte_array += int.to_bytes(tamanho_payload, 1, byteorder='little')
-    
-    byte_array += bytearray([0]*8)
-    
-    byte_array += int.to_bytes(handshake,1, byteorder='little')
-
-    return byte_array
-
-
-
-def constroi_datagramas(lista_payloads):
-    datagramas = []
-    posicao = 1
-    total_pacotes = len(lista_payloads)
-    for payload in lista_payloads:
-        tamanho_payload = len(payload)
-        head = constroi_head(posicao, total_pacotes, tamanho_payload, 0)
-        datagrama = head + payload
-        datagrama = datagrama + EOP
         
-        datagramas.append(datagrama)
-        posicao += 1
-    return datagramas
-        
-    
 def constroi_pacotes(mensagem):
-    print(type(mensagem))
     pacotes = []
     i = 0
     while i < len(mensagem):
         pacote = bytearray([])
-        while len(pacote) < 50 and i < len(mensagem):
+        while len(pacote) < 114 and i < len(mensagem):
             pacote.append(mensagem[i])
             i += 1
         pacotes.append(pacote)
     return pacotes
 
 def split_message(message):
-    head = message[0:12]
-    eop = message[-3:]
-    message = message[12:]
-    message = message[:-3]
+    head = message[0:10]
+    eop = message[-4:]
+    message = message[10:]
+    message = message[:-4]
     payload = message
 
     return head, payload, eop
 
-# voce deverá descomentar e configurar a porta com através da qual ira fazer comunicaçao
-#   para saber a sua porta, execute no terminal :
-#   python -m serial.tools.list_ports
-# se estiver usando windows, o gerenciador de dispositivos informa a porta
+def gera_t1(servidor, total_pacotes, id_arquivo):
+    return  b'\x01' + int.to_bytes(servidor, 1, 'little') + b'\x00' + int.to_bytes(total_pacotes, 1, 'little') + int.to_bytes(id_arquivo, 1, 'little') + b'\x00\x00\x00\x00\x00' + EOP
+
+def gera_t3(numero_do_pacote, conteudo, total_pacotes):
+    head = b'\x03\x00\x00' + int.to_bytes(total_pacotes, 1, 'little') + int.to_bytes(numero_do_pacote, 1, 'little') + int.to_bytes(len(conteudo), 1, 'little') + b'\x00\x00\x00\x00'
+    return head + conteudo + EOP
+
+def gera_t5():
+    return b'\x05\x00\x00\x00\x00\x00\x00\x00\x00\x00' + EOP
+
 
 #use uma das 3 opcoes para atribuir à variável a porta usada
 #serialName = "/dev/ttyACM0"           # Ubuntu (variacao de)
@@ -140,23 +76,24 @@ def main():
         imageR = "testes.jpeg"
         imagemBytes = open(imageR, 'rb').read()
         pacotes = constroi_pacotes(imagemBytes)
-        datagramas = constroi_datagramas(pacotes)
-
-        # print("Sorteando comandos e construíndo mensagens")
-        # comandos = sorteia_comandos()
-        # print(f"Serão enviados {len(comandos)} comandos")
-        # print(comandos)
-        # conteudo = constroi_mensagem(comandos)
-        # lista = constroi_pacotes(conteudo)
-        # #print(lista)
-        # datagramas = constroi_datagramas(lista)
-
+        total_pacotes = len(pacotes)
+        print("Serão enviados " + str(total_pacotes) + "pacotes")
+        id_arquivo = 0
+        while os.path.exists(f"{id_arquivo}.txt"):
+            id_arquivo += 1
+        
+        with open(f"{id_arquivo}.txt" , 'w') as arquivo:
+        # Escreva o conteúdo que desejar no arquivo
+            arquivo.write("Começando transmissão\n")
+            arquivo.write("....\n")
+        
         handshake = False
         mensagem_hs = bytearray()
 
         tempo_handshake = datetime.datetime.now()
         
-        com1.sendData(MENSAGEM_HANDSHAKE)
+        com1.sendData(gera_t1(servidor, total_pacotes, id_arquivo))
+        time.sleep(0.1)
         while com1.tx.getIsBussy():
             pass
         
@@ -164,9 +101,8 @@ def main():
             
             if (datetime.datetime.now() - tempo_handshake > datetime.timedelta(seconds=5)):
                 print("Reenviando HANDSHAKE, NÃO HOUVE RESPOSTA")
-                com1.sendData(MENSAGEM_HANDSHAKE)
-                while com1.tx.getIsBussy():
-                    pass
+                com1.sendData(gera_t1(servidor, total_pacotes, id_arquivo))
+                time.sleep(0.1)
                 tempo_handshake = datetime.datetime.now()
             
             
@@ -177,84 +113,83 @@ def main():
                 if com1.rx.getBufferLen() == 0:
                     head, payload, eop = split_message(mensagem_hs)
                     
-                    if eop != b'\xfb\xfb\xfb':
+                    if eop != EOP:
                         print("Erro no EOP!")
                         break
                 
-                    if len(payload) != int(head[2]):
+                    if len(payload) != int(head[5]):
                         print("Tamanho do payload não condiz com o head!")
                         break
-                    print(mensagem_hs)
-                    if mensagem_hs == MENSAGEM_HANDSHAKE:
+                    
+                    if int(head[0]) == 2:
                         handshake = True
                         print("HANDSHAKE FEITO COM SUCESSO")
                     
                         
-                        
-    
-    
-        tempo_inicio = datetime.datetime.now()
-        pacote_number = 1
-        i = 0
-        flag_erro = True
-        while i < len(datagramas):
-            datagrama = datagramas[i]
+        
+        i = 0 #pacote que está sendo enviado
+        flag_timeout = False
+        cont = 1 #contagem de quantos pacotes foram recebidos com sucesso pelo servidor
+        
+        
+        while cont <= total_pacotes and flag_timeout == False:
             mensagem = bytearray()
             
-            # SIMULAÇÃO DE ERRO 
-            if i == 2 and flag_erro:
-                #datagrama = datagrama[:-1]  #OPÇÃO 1
-                datagrama = int.to_bytes(4, 1, 'little') + datagrama[1:] # OPÇÃO 2, erro no número do pacote
-                #datagrama = datagrama[0:1] + datagrama[1:2] + int.to_bytes(51, 1, 'little') + datagrama[3:] #OPÇÃO 3, tamanho do payload errado
-                flag_erro = False
-            
-            print(datagrama)
-            recebeu_pacote = False
-            
-            txBuffer = datagrama
-            
+            txBuffer = gera_t3(cont, pacotes[i], total_pacotes)
+            recebeu_t4 = False
             com1.sendData(np.asarray(txBuffer))
+            time.sleep(0.1)
+            timer1 = datetime.datetime.now()
+            timer2 = datetime.datetime.now()
+            
             while com1.tx.getIsBussy():
                 pass
-            
-            while not recebeu_pacote:
-                if (datetime.datetime.now() - tempo_inicio > datetime.timedelta(seconds=5)):
-                    print("Servidor não deu resposta há 5 segundos")
-                    tempo_inicio = datetime.datetime.now()
-                    print("Esperando...")
-                    
-                
-                if com1.rx.getBufferLen() > 0:
-                    recebeu_pacote = True
+            while not recebeu_t4:
+                if (datetime.datetime.now() - timer1 > datetime.timedelta(seconds=5)):
+                    print("Servidor não deu resposta há 5 segundos, reenviando...")
+                    timer1 = datetime.datetime.now()
+                    txBuffer = gera_t3(cont, pacotes[i], total_pacotes)
+                    com1.sendData(np.asarray(txBuffer))
+                    time.sleep(0.1)
+                elif (datetime.datetime.now() - timer2 > datetime.timedelta(seconds=20)):
+                    txBuffer = gera_t5()
+                    com1.sendData(np.asanyarray(txBuffer))
+                    time.sleep(0.1)
+                    flag_timeout = True
+                    print("Time out! Encerrando...")
+                    break
+                elif com1.rx.getBufferLen() > 0:
+                    timer1 = datetime.datetime.now()
                     rxBuffer, nRx = com1.getData(com1.rx.getBufferLen())
                     mensagem += rxBuffer
-                    if mensagem == MENSAGEM_SUCESSO:
-                        print(f"Pacote {pacote_number} recebido pelo cliente")
-                        pacote_number += 1
-                        i += 1
-                        tempo_inicio = datetime.datetime.now()
-                    elif mensagem == MENSAGEM_ENCERRADA:
-                        print(f"Pacote {pacote_number} recebido pelo cliente")
-                        print("Finalizando...")
-                        i += 1
-                        tempo_inicio = datetime.datetime.now()
-                    elif mensagem_hs == MENSAGEM_VOLTA:
-                        i -= 1
-                        pacote_number -= 1
-                        print("PASSEI DO PROBLEMA")
-                    else:
-                        print("Erro na mensagem de confirmação de recebimento do pacote.")
-                        print(mensagem)
-        
-        
-        #as array apenas como boa pratica para casos de ter uma outra forma de dados
-        # A camada enlace possui uma camada inferior, TX possui um método para conhecermos o status da transmissão
-        # O método não deve estar fincionando quando usado como abaixo. deve estar retornando zero. Tente entender como esse método funciona e faça-o funcionar.
-        while com1.tx.getIsBussy():
-            pass
-            
-            #print(mensagem)
-
+                    
+                    if com1.rx.getBufferLen() == 0:
+                        head, payload, eop = split_message(mensagem)
+                        
+                        if eop != EOP:
+                            print("EOP errado")
+                        elif int(mensagem[0]) == 6:
+                            pacote_esperado = int(head[6])
+                            if pacote_esperado != i+1:
+                                i = pacote_esperado - 1
+                            txBuffer = gera_t3(cont, pacotes[i], total_pacotes)
+                            com1.sendData(np.asarray(txBuffer))
+                            timer1 = datetime.datetime.now()
+                            timer2 = datetime.datetime.now()
+                            time.sleep(0.1)
+                        
+                        elif int(mensagem[0]) == 4:
+                            print(head)
+                            pacote_recebido = int(head[7])
+                            print("O pacote enviado foi " + str(cont))
+                            print("O cliente falou que recebeu" + str(pacote_recebido))
+                            if pacote_recebido == cont:
+                                print(f"Pacote {cont} recebido com sucesso pelo servidor.")
+                            recebeu_t4 = True
+                    
+            i += 1
+            cont += 1
+    
             
     
         # Encerra comunicação

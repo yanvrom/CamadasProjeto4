@@ -1,21 +1,29 @@
 Bytes
 
 Head:
-0- Número do pacote
-1- Total de pacotes
-2- Tamanho do Payload
-3- 
-4-
-5-
-6-
-7-
-8-
-9-
-10-
-11- Handshake
+0- Tipo de mensagem
+1- Se tipo for 1:número do servidor. Qualquer outro tipo: livre
+2- Livre
+3- Total de pacotes do arquivo
+4- Número do pacote que está sendo enviado
+5- Se tipo for handshake: id do arquivo (criar um para cada arquivo). Se tipo for dados: tamanho do payload
+6- Pacote solicitado para recomeço quando há erro no envio
+7- Último pacote reebido com sucesso
+8- deixar em branco (projeto 5)
+9- deixar em branco (projeto 5)
+10- deixar em branco (projeto 5)
 
 
-PAYLOAD: 12 ~ 61
+PAYLOAD: possui de 0 a 114 bytes, ou seja,
+se possui bytes vai da posição 11 até 124
 
 
-EOP:   /xfb/xfb/xfb
+EOP:   /xaa/xbb/xcc/xdd
+
+
+Tipos de mensagens: (o número do tipo deve ficar no byte que diz o tipo h0)
+tipo 1: início da transmissão, o cliente envia um chamado
+para o servidor passando o identificador (número do servidor)
+Deve conter o total de pacotes que se deseja enviar
+
+Tipo 2: 
