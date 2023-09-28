@@ -55,10 +55,10 @@ def gera_t3(numero_do_pacote, conteudo, total_pacotes):
 def gera_t5():
     return b'\x05\x00\x00\x00\x00\x00\x00\x00\x00\x00' + EOP
 
-def escreve_arquivo(mensagem, sentido):
+def escreve_arquivo(id, mensagem, sentido):
     tempo = datetime.datetime.now()
     tipo = str(int(mensagem[0]))
-    with open(f"Cliente.txt" , 'a') as arquivo:
+    with open(f"{id}Cliente.txt" , 'a') as arquivo:
         # Escreva o conteúdo que desejar no arquivo
         texto = f"{tempo} / {sentido} / {tipo} / {len(mensagem)}"
         if tipo == "3":
@@ -97,7 +97,9 @@ def main():
         print("Serão enviados " + str(total_pacotes) + "pacotes")
         id_arquivo = 0
         
-        
+        id = 0
+        while os.path.exists(f"{id}Cliente.txt"):
+            id += 1
         
         handshake = False
         mensagem_hs = bytearray()
@@ -105,7 +107,7 @@ def main():
         tempo_handshake = datetime.datetime.now()
         handsk = gera_t1(servidor, total_pacotes, id_arquivo)
         com1.sendData(handsk)
-        escreve_arquivo(handsk, "envio")
+        escreve_arquivo(id, handsk, "envio")
         
         time.sleep(0.1)
         while com1.tx.getIsBussy():
@@ -117,18 +119,19 @@ def main():
                 print("Reenviando HANDSHAKE, NÃO HOUVE RESPOSTA")
                 txBuffer = gera_t1(servidor, total_pacotes, id_arquivo)
                 com1.sendData(txBuffer)
-                escreve_arquivo(txBuffer, "envio")
+                escreve_arquivo(id, txBuffer, "envio")
                 
                 time.sleep(0.1)
                 tempo_handshake = datetime.datetime.now()
             
             
             if com1.rx.getBufferLen() > 0:
+                time.sleep(0.1)
                 rxBuffer, nRx = com1.getData(com1.rx.getBufferLen())
                 mensagem_hs = rxBuffer
 
                 if com1.rx.getBufferLen() == 0:
-                    escreve_arquivo(mensagem_hs, "receb")
+                    escreve_arquivo(id, mensagem_hs, "receb")
                     head, payload, eop = split_message(mensagem_hs)
                     
                     if eop != EOP:
@@ -153,17 +156,19 @@ def main():
         while cont <= total_pacotes and flag_timeout == False:
             mensagem = bytearray()
             
-            ##Força erro de ordem de mensagem enviada
+            # ---------------------------------------------------------------
+            # #Força erro de ordem de mensagem enviada
             # forcou_erro = False
             # if cont == 4 and not forcou_erro:
             #     cont += 1
             #     i += 1
             #     forcou_erro = True
-                
+            #-------------------------------------------------------------------
+            
             txBuffer = gera_t3(cont, pacotes[i], total_pacotes)
             recebeu_t4 = False
             com1.sendData(np.asarray(txBuffer))
-            escreve_arquivo(txBuffer, "envio")
+            escreve_arquivo(id, txBuffer, "envio")
             
             
             time.sleep(0.1)
@@ -178,23 +183,24 @@ def main():
                     timer1 = datetime.datetime.now()
                     txBuffer = gera_t3(cont, pacotes[i], total_pacotes)
                     com1.sendData(np.asarray(txBuffer))
-                    escreve_arquivo(txBuffer, "envio")
+                    escreve_arquivo(id, txBuffer, "envio")
                     time.sleep(0.1)
                 elif (datetime.datetime.now() - timer2 > datetime.timedelta(seconds=20)):
                     txBuffer = gera_t5()
                     com1.sendData(np.asanyarray(txBuffer))
-                    escreve_arquivo(txBuffer, "envio")
+                    escreve_arquivo(id, txBuffer, "envio")
                     time.sleep(0.1)
                     flag_timeout = True
                     print("Time out! Encerrando...")
                     break
                 elif com1.rx.getBufferLen() > 0:
                     timer1 = datetime.datetime.now()
+                    time.sleep(0.1)
                     rxBuffer, nRx = com1.getData(com1.rx.getBufferLen())
                     mensagem = rxBuffer
                     
                     if com1.rx.getBufferLen() == 0:
-                        escreve_arquivo(mensagem, "receb")
+                        escreve_arquivo(id, mensagem, "receb")
                         head, payload, eop = split_message(mensagem)
                         
                         if eop != EOP:
@@ -206,7 +212,7 @@ def main():
                                 i = pacote_esperado - 1
                             txBuffer = gera_t3(cont, pacotes[i], total_pacotes)
                             com1.sendData(np.asarray(txBuffer))
-                            escreve_arquivo(txBuffer, "envio")
+                            escreve_arquivo(id, txBuffer, "envio")
                             timer1 = datetime.datetime.now()
                             timer2 = datetime.datetime.now()
                             time.sleep(0.1)
