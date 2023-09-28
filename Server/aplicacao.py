@@ -15,6 +15,7 @@ import time
 import numpy as np
 import datetime
 import os
+from crc import Calculator, Crc16
 
 # voce deverá descomentar e configurar a porta com através da qual ira fazer comunicaçao
 #   para saber a sua porta, execute no terminal :
@@ -65,8 +66,11 @@ def split_message(message):
 
     return head, payload, eop
 
-def checa_crc(head, payload):
-    pass
+def calcula_crc(paylo):
+    calculator = Calculator(Crc16.CCITT)
+    crc_payload = calculator.checksum(paylo)
+    crc_bytes = crc_payload.to_bytes(2, byteorder='big')
+    return crc_bytes
 
 def escreve_report(entrada, id):
     with open(f"Server{id}.txt", 'a') as arquivo:
@@ -159,12 +163,16 @@ def main():
 
                 head, payload, eop = split_message(mensagem)
 
+                crc = calcula_crc(payload)
+                print(f"CRC: {crc}")
+                print(f"CRC HEAD: {head[-2:]}")
+
                 flag_erro = False
 
                 tempo = datetime.datetime.now()
                 print(tempo,end=' ')
-                escreve_report(f"{tempo} / receb / {head[0]} / {head[5]} / {head[4]} / {head[3]}", id)
-                
+                escreve_report(f"{tempo} / receb / {head[0]} / {head[5]} / {head[4]} / {head[3]} / {crc}", id)
+                    
                 # CHECANDO SE EOP VEIO CERTO
                 if eop != EOP:
                     erro_msg = "Erro no EOP!"
@@ -178,6 +186,10 @@ def main():
                 # CHECANDO SE NUMERO DA MENSAGEM RECEBIDA E O ESPERADO
                 elif cont != head[4]:
                     erro_msg = f"Esperando mensagem {cont}, mas head diz {head[4]}"
+                    flag_erro = True
+
+                elif int.from_bytes(crc, 'big') != int.from_bytes(head[-2:], 'big'):
+                    erro_msg = f"CRC resultou {calcula_crc(payload)}, mas head diz {head[-2:]}"
                     flag_erro = True
 
                 # CHECANDO SE A MENSAGEM PASSA DO LIMITE DE 128 BYTES
